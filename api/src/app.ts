@@ -1,6 +1,8 @@
 import fastify from "fastify";
 import cors from "@fastify/cors";
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
+import documentRoutes from "./documents/document.routes";
+import orgRoutes from "./organizations/org.routes";
 
 const app = fastify({
   logger: true,
@@ -17,11 +19,13 @@ await app.register(cors, {
 // Health check
 app.get("/health", async () => ({ status: "ok" }));
 
-// TODO: Register routes (documents, orgs, search, webhooks)
+// Register routes
+await app.register(documentRoutes, { prefix: "/api/documents" });
+await app.register(orgRoutes, { prefix: "/api/orgs" });
 
 const start = async () => {
   try {
-    const port = parseInt(process.env.PORT || "3000", 10);
+    const port = parseInt(process.env.PORT || "8080", 10);
     await app.listen({ port, host: "0.0.0.0" });
     console.log(`API running on http://localhost:${port}`);
   } catch (err) {

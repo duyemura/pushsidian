@@ -49,6 +49,23 @@ export class OrgService {
     return db.selectFrom("organizations").selectAll().where("slug", "=", slug).executeTakeFirst();
   }
 
+  async listForUser(userId: string) {
+    const db = getDB();
+    return db
+      .selectFrom("org_memberships")
+      .innerJoin("organizations", "org_memberships.org_id", "organizations.id")
+      .where("org_memberships.user_id", "=", userId)
+      .select([
+        "organizations.id",
+        "organizations.slug",
+        "organizations.display_name",
+        "organizations.owner_id",
+        "organizations.created_at",
+        "org_memberships.role",
+      ])
+      .execute();
+  }
+
   async listMembers(orgId: string) {
     const db = getDB();
     return db

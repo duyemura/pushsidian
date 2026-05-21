@@ -4,7 +4,7 @@ import { getDB } from "../db";
 
 const ClerkWebhookBody = z.object({
   type: z.string(),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 
 const routes: FastifyPluginAsyncZod = async (app) => {

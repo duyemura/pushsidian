@@ -9,7 +9,6 @@ export interface CurrentUser {
 }
 
 export async function verifyAuth(req: FastifyRequest): Promise<CurrentUser> {
-  // @clerk/fastify decorates req with auth after the plugin is registered
   const auth = (req as any).auth;
   if (!auth?.userId) {
     throw new Error("Unauthorized");
@@ -25,7 +24,6 @@ export async function verifyAuth(req: FastifyRequest): Promise<CurrentUser> {
   const db = getDB();
   const userId = `user_${clerkId}`;
 
-  // Upsert subject
   await db
     .insertInto("subjects")
     .values({
@@ -34,6 +32,8 @@ export async function verifyAuth(req: FastifyRequest): Promise<CurrentUser> {
       clerk_id: clerkId,
       email,
       display_name: displayName,
+      avatar_url: null,
+      created_at: new Date(),
     })
     .onConflict((oc) =>
       oc.column("id").doUpdateSet({

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { OrgService } from "./org.service";
+import { verifyAuth } from "../auth";
 
 const orgService = new OrgService();
 
@@ -24,11 +25,12 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (req, reply) => {
-      const ownerId = "user:placeholder"; // TODO: from auth
+      const user = await verifyAuth(req);
+      const body = req.body as { slug: string; display_name: string };
       const org = await orgService.create({
-        slug: req.body.slug,
-        display_name: req.body.display_name,
-        owner_id: ownerId,
+        slug: body.slug,
+        display_name: body.display_name,
+        owner_id: user.id,
       });
       reply.status(201);
       return {
@@ -57,7 +59,8 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (req) => {
-      const org = await orgService.getById(req.params.id);
+      const { id } = req.params as { id: string };
+      const org = await orgService.getById(id);
       if (!org) throw new Error("Not found");
       return {
         id: org.id,
@@ -88,7 +91,8 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (req) => {
-      const members = await orgService.listMembers(req.params.id);
+      const { id } = req.params as { id: string };
+      const members = await orgService.listMembers(id);
       return members.map((m) => ({
         id: m.id,
         display_name: m.display_name,
@@ -118,7 +122,9 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (req, reply) => {
-      const group = await orgService.createGroup(req.params.id, req.body.display_name, req.body.slug);
+      const { id } = req.params as { id: string };
+      const body = req.body as { display_name: string; slug: string };
+      const group = await orgService.createGroup(id, body.display_name, body.slug);
       reply.status(201);
       return {
         id: group.id,
@@ -145,7 +151,8 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (req) => {
-      const groups = await orgService.listGroups(req.params.id);
+      const { id } = req.params as { id: string };
+      const groups = await orgService.listGroups(id);
       return groups.map((g) => ({
         id: g.id,
         display_name: g.display_name,

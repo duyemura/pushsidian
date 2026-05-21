@@ -9,26 +9,30 @@ export class OrgService {
     const db = getDB();
     const org = await db
       .insertInto("organizations")
-      .values(data)
+      .values({
+        ...data,
+        id: crypto.randomUUID(),
+        created_at: new Date(),
+      })
       .returningAll()
       .executeTakeFirstOrThrow();
 
-    // Create default groups
     await db
       .insertInto("groups")
       .values([
-        { org_id: org.id, display_name: "Everyone", slug: "everyone" },
-        { org_id: org.id, display_name: "Admin", slug: "admin" },
+        { id: crypto.randomUUID(), org_id: org.id, display_name: "Everyone", slug: "everyone", created_at: new Date() },
+        { id: crypto.randomUUID(), org_id: org.id, display_name: "Admin", slug: "admin", created_at: new Date() },
       ])
       .execute();
 
-    // Add owner to org membership
     await db
       .insertInto("org_memberships")
       .values({
+        id: crypto.randomUUID(),
         org_id: org.id,
         user_id: data.owner_id,
         role: "owner",
+        created_at: new Date(),
       })
       .execute();
 
@@ -65,7 +69,7 @@ export class OrgService {
     const db = getDB();
     return db
       .insertInto("groups")
-      .values({ org_id: orgId, display_name: displayName, slug })
+      .values({ id: crypto.randomUUID(), org_id: orgId, display_name: displayName, slug, created_at: new Date() })
       .returningAll()
       .executeTakeFirstOrThrow();
   }

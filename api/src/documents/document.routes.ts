@@ -28,7 +28,8 @@ const routes: FastifyPluginAsyncZod = async (app) => {
     },
     async (req) => {
       const user = await verifyAuth(req);
-      const docs = await documentService.listAccessible(user.id, req.query.org_id);
+      const { org_id } = req.query as { org_id: string };
+      const docs = await documentService.listAccessible(user.id, org_id);
       return docs.map((d) => ({
         id: d.id,
         obsidian_path: d.obsidian_path,
@@ -64,15 +65,24 @@ const routes: FastifyPluginAsyncZod = async (app) => {
     },
     async (req, reply) => {
       const user = await verifyAuth(req);
+      const body = req.body as {
+        org_id: string;
+        vault_id: string;
+        obsidian_path: string;
+        title?: string;
+        content: string;
+        content_hash: string;
+        rules: { subject_id: string; relation: string }[];
+      };
       const docId = await documentService.upsertWithContent({
-        org_id: req.body.org_id,
+        org_id: body.org_id,
         owner_id: user.id,
-        vault_id: req.body.vault_id,
-        obsidian_path: req.body.obsidian_path,
-        title: req.body.title ?? null,
-        content: req.body.content,
-        content_hash: req.body.content_hash,
-        rules: req.body.rules,
+        vault_id: body.vault_id,
+        obsidian_path: body.obsidian_path,
+        title: body.title ?? null,
+        content: body.content,
+        content_hash: body.content_hash,
+        rules: body.rules,
       });
       reply.status(201);
       return { id: docId };
@@ -97,11 +107,11 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (req) => {
-      const user = await verifyAuth(req);
-      const doc = await documentService.getById(req.params.id);
+      await verifyAuth(req);
+      const { id } = req.params as { id: string };
+      const doc = await documentService.getById(id);
       if (!doc) throw new Error("Not found");
-      // TODO: verify ACL
-      const { getDocumentUrl } = await import("../s3");
+      const { getDocumentUrl } = await import("../s3.js");
       const contentUrl = await getDocumentUrl(doc.s3_key);
       return {
         id: doc.id,
@@ -131,7 +141,8 @@ const routes: FastifyPluginAsyncZod = async (app) => {
     },
     async (req) => {
       await verifyAuth(req);
-      const rules = await documentService.getRules(req.params.id);
+      const { id } = req.params as { id: string };
+      const rules = await documentService.getRules(id);
       return rules.map((r) => ({
         subject_id: r.subject_id,
         relation: r.relation,

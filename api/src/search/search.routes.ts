@@ -30,7 +30,8 @@ const routes: FastifyPluginAsyncZod = async (app) => {
     },
     async (req) => {
       const user = await verifyAuth(req);
-      return searchService.fullTextSearch(req.body.query, user.id, req.body.org_id, req.body.limit);
+      const body = req.body as { query: string; org_id: string; limit: number };
+      return searchService.fullTextSearch(body.query, user.id, body.org_id, body.limit);
     }
   );
 
@@ -58,7 +59,8 @@ const routes: FastifyPluginAsyncZod = async (app) => {
     },
     async (req) => {
       const user = await verifyAuth(req);
-      return searchService.getContextForPrompt(req.body.query, user.id, req.body.org_id, req.body.limit);
+      const body = req.body as { query: string; org_id: string; limit: number };
+      return searchService.getContextForPrompt(body.query, user.id, body.org_id, body.limit);
     }
   );
 };

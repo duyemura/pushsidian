@@ -36,7 +36,14 @@ export class DocumentService {
     const db = getDB();
     const doc = await db
       .insertInto("documents")
-      .values(data)
+      .values({
+        ...data,
+        id: crypto.randomUUID(),
+        version: 1,
+        is_deleted: false,
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
       .returningAll()
       .executeTakeFirstOrThrow();
     return doc;
@@ -59,6 +66,7 @@ export class DocumentService {
           subject_id: r.subject_id,
           relation: r.relation as "reader" | "writer" | "owner",
           granted_by: grantedBy,
+          granted_at: new Date(),
         }))
       )
       .execute();
@@ -85,7 +93,6 @@ export class DocumentService {
       .executeTakeFirst();
 
     if (existing) {
-      // Update existing
       await db
         .updateTable("documents")
         .set({
@@ -99,8 +106,6 @@ export class DocumentService {
 
       await uploadDocument(existing.s3_key, data.content);
       await this.setRules(existing.id, data.rules, data.owner_id);
-
-      // Delete old chunks, will be re-indexed separately
       await db.deleteFrom("document_chunks").where("document_id", "=", existing.id).execute();
 
       return existing.id;

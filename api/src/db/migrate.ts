@@ -2,11 +2,12 @@ import { promises as fs } from "fs";
 import { resolve } from "path";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import { Pool } from "pg";
+import type { DB } from "./types";
 
 const MIGRATIONS_DIR = resolve(__dirname, "migrations");
 
 async function migrate() {
-  const db = new Kysely({
+  const db = new Kysely<DB>({
     dialect: new PostgresDialect({
       pool: new Pool({
         connectionString: process.env.DATABASE_URL,
@@ -14,7 +15,6 @@ async function migrate() {
     }),
   });
 
-  // Create migrations table if not exists
   await sql`
     CREATE TABLE IF NOT EXISTS migrations (
       name TEXT PRIMARY KEY,
@@ -40,7 +40,7 @@ async function migrate() {
     const content = await fs.readFile(resolve(MIGRATIONS_DIR, file), "utf-8");
     console.log(`Running ${file}`);
     await sql.raw(content).execute(db);
-    await db.insertInto("migrations").values({ name: file }).execute();
+    await db.insertInto("migrations").values({ name: file, executed_at: new Date() }).execute();
   }
 
   console.log("Migrations complete");

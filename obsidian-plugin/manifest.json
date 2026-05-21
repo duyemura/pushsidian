@@ -1,0 +1,11 @@
+{
+  "id": "pushsidian",
+  "name": "Pushsidian",
+  "version": "0.1.0",
+  "minAppVersion": "0.15.0",
+  "description": "Share notes with your team and let AI tap into your collective knowledge.",
+  "author": "Dan Uyemura",
+  "authorUrl": "https://github.com/duyemura",
+  "fundingUrl": "",
+  "isDesktopOnly": false
+}

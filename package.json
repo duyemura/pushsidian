@@ -1,0 +1,19 @@
+{
+  "name": "pushsidian",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Team knowledge layer on Obsidian",
+  "scripts": {
+    "dev:api": "pnpm --filter api dev",
+    "dev:web": "pnpm --filter web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
+  }
+}

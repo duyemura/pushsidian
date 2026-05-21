@@ -1,0 +1,37 @@
+{
+  "name": "@pushsidian/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:generate": "kysely-codegen --dialect postgres --out-file src/db/generated-types.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.600.0",
+    "@clerk/fastify": "^1.0.0",
+    "@fastify/cors": "^9.0.0",
+    "@fastify/swagger": "^9.0.0",
+    "@fastify/swagger-ui": "^5.0.0",
+    "fastify": "^5.0.0",
+    "fastify-plugin": "^5.0.0",
+    "fastify-type-provider-zod": "^2.0.0",
+    "kysely": "^0.27.0",
+    "pg": "^8.12.0",
+    "zod": "^3.23.0",
+    "@pushsidian/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.0",
+    "eslint": "^8.0.0",
+    "kysely-codegen": "^0.16.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0"
+  }
+}

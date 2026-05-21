@@ -1,0 +1,20 @@
+{
+  "name": "pushsidian",
+  "version": "0.1.0",
+  "description": "Team knowledge layer for Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["obsidian", "plugin", "knowledge", "team"],
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.21.0",
+    "obsidian": "latest",
+    "tslib": "^2.6.0",
+    "typescript": "^5.9.0"
+  }
+}

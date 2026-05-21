@@ -1,6 +1,9 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export async function fetchWithAuth(url: string, options: RequestInit = {}) {
+  // Use relative paths so Vite dev proxy handles /api → backend
+  const fullUrl = url.startsWith("/") ? url : `${API_BASE}${url}`;
+
   const token = window.localStorage.getItem("clerk-token");
   const headers = {
     ...options.headers,
@@ -8,7 +11,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const res = await fetch(`${API_BASE}${url}`, { ...options, headers });
+  const res = await fetch(fullUrl, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || `HTTP ${res.status}`);

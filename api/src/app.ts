@@ -5,6 +5,7 @@ import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fas
 import documentRoutes from "./documents/document.routes";
 import orgRoutes from "./organizations/org.routes";
 import searchRoutes from "./search/search.routes";
+import clerkWebhookRoutes from "./webhooks/clerk.routes";
 
 async function main() {
   const app = fastify({
@@ -29,6 +30,7 @@ async function main() {
   await app.register(documentRoutes, { prefix: "/api/documents" });
   await app.register(orgRoutes, { prefix: "/api/orgs" });
   await app.register(searchRoutes, { prefix: "/api/search" });
+  await app.register(clerkWebhookRoutes, { prefix: "/webhooks" });
 
   const port = parseInt(process.env.PORT || "8080", 10);
   await app.listen({ port, host: "0.0.0.0" });

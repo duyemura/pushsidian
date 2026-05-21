@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { SignedIn, SignedOut, SignIn, SignUp } from "@clerk/clerk-react";
+import AuthGuard from "./components/AuthGuard";
 import Dashboard from "./pages/Dashboard";
 import TeamSettings from "./pages/TeamSettings";
 import Layout from "./components/Layout";
@@ -33,12 +34,14 @@ function App() {
               </div>
             </SignedOut>
             <SignedIn>
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/team" element={<TeamSettings />} />
-                </Routes>
-              </Layout>
+              <AuthGuard>
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/team" element={<TeamSettings />} />
+                  </Routes>
+                </Layout>
+              </AuthGuard>
             </SignedIn>
           </>
         }

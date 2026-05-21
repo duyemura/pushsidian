@@ -25,7 +25,7 @@ export default function Dashboard() {
 
   // Fetch user's orgs on mount
   useEffect(() => {
-    fetchWithAuth("/api/orgs/me")
+    fetchWithAuth("/api/user/orgs")
       .then((data: Org[]) => {
         setOrgs(data);
         if (data.length > 0) {

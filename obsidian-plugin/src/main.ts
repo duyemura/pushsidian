@@ -1,8 +1,11 @@
 import { Plugin, TFile, Notice, Modal, App, Setting, ItemView, WorkspaceLeaf } from "obsidian";
+import { PushsidianAPI } from "./api";
+import { FileWatcher } from "./sync/file-watcher";
+import { Downloader } from "./sync/downloader";
 
 const VIEW_TYPE_TEAM = "pushsidian-team-panel";
 
-interface PushsidianSettings {
+export interface PushsidianSettings {
   apiKey: string;
   apiBaseUrl: string;
   orgId: string;
@@ -34,8 +37,7 @@ class ShareModal extends Modal {
   }
 
   onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
+    this.contentEl.empty();
   }
 }
 
@@ -62,18 +64,24 @@ class TeamPanelView extends ItemView {
 
 export default class PushsidianPlugin extends Plugin {
   settings: PushsidianSettings;
+  api: PushsidianAPI;
+  fileWatcher: FileWatcher;
+  downloader: Downloader;
 
   async onload() {
     await this.loadSettings();
+    this.api = new PushsidianAPI(this);
+    this.fileWatcher = new FileWatcher(this);
+    this.downloader = new Downloader(this);
 
-    this.addRibbonIcon("share", "Share note", (evt: MouseEvent) => {
+    this.addRibbonIcon("share", "Share note", () => {
       new ShareModal(this.app).open();
     });
 
     this.addCommand({
       id: "share-note",
       name: "Share current note",
-      editorCallback: (editor, view) => {
+      editorCallback: () => {
         new ShareModal(this.app).open();
       },
     });
@@ -83,35 +91,40 @@ export default class PushsidianPlugin extends Plugin {
     this.addCommand({
       id: "open-team-panel",
       name: "Open team knowledge panel",
-      callback: () => {
-        this.activateView();
+      callback: () => this.activateView(),
+    });
+
+    this.addCommand({
+      id: "sync-shared-docs",
+      name: "Sync shared documents now",
+      callback: async () => {
+        await this.downloader.syncSharedDocuments();
+        new Notice("Shared documents synced");
       },
     });
 
     this.addSettingTab(new PushsidianSettingTab(this.app, this));
 
+    // File watchers
     if (this.settings.syncEnabled) {
       this.registerEvent(
         this.app.vault.on("create", (file) => {
           if (file instanceof TFile && file.extension === "md") {
-            this.handleFileChange(file);
+            this.fileWatcher.onFileChange(file);
           }
         })
       );
       this.registerEvent(
         this.app.vault.on("modify", (file) => {
           if (file instanceof TFile && file.extension === "md") {
-            this.handleFileChange(file);
+            this.fileWatcher.onFileChange(file);
           }
         })
       );
     }
-  }
 
-  async handleFileChange(file: TFile) {
-    const cache = this.app.metadataCache.getFileCache(file);
-    if (!cache?.frontmatter?.share) return;
-    // TODO: read content, hash, compare with last sync, upload to API
+    // Initial sync of shared docs
+    this.downloader.syncSharedDocuments();
   }
 
   async activateView() {
@@ -119,7 +132,7 @@ export default class PushsidianPlugin extends Plugin {
     let leaf = workspace.getLeavesOfType(VIEW_TYPE_TEAM)[0];
     if (!leaf) {
       leaf = workspace.getRightLeaf(false);
-      await leaf?.setViewState({ type: VIEW_TYPE_TEAM, active: true });
+      if (leaf) await leaf.setViewState({ type: VIEW_TYPE_TEAM, active: true });
     }
     if (leaf) workspace.revealLeaf(leaf);
   }
@@ -127,11 +140,16 @@ export default class PushsidianPlugin extends Plugin {
   onunload() {}
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const data = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings);
+    this.fileWatcher?.loadCache(data?.syncCache ?? {});
   }
 
   async saveSettings() {
-    await this.saveData(this.settings);
+    await this.saveData({
+      settings: this.settings,
+      syncCache: this.fileWatcher?.saveCache() ?? {},
+    });
   }
 }
 

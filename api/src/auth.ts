@@ -1,19 +1,47 @@
-import { clerkClient } from "@clerk/fastify";
 import type { FastifyRequest } from "fastify";
+import { getDB } from "./db";
 
-export async function getCurrentUser(req: FastifyRequest) {
-  // In production this comes from Clerk's fastify plugin
-  // For now, return a placeholder until Clerk is wired up
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
+export interface CurrentUser {
+  id: string;
+  clerkId: string;
+  email: string;
+  displayName: string;
+}
+
+export async function verifyAuth(req: FastifyRequest): Promise<CurrentUser> {
+  // @clerk/fastify decorates req with auth after the plugin is registered
+  const auth = (req as any).auth;
+  if (!auth?.userId) {
     throw new Error("Unauthorized");
   }
-  const token = authHeader.slice(7);
-  // TODO: verify Clerk JWT and look up user in subjects table
-  return {
-    id: "user:placeholder",
-    clerkId: "placeholder",
-    email: "user@example.com",
-    displayName: "User",
-  };
+
+  const clerkId = auth.userId as string;
+  const email = (auth.sessionClaims?.email as string) ?? "";
+  const displayName =
+    (auth.sessionClaims?.firstName as string)
+      ? `${auth.sessionClaims?.firstName} ${(auth.sessionClaims?.lastName as string) ?? ""}`.trim()
+      : email;
+
+  const db = getDB();
+  const userId = `user_${clerkId}`;
+
+  // Upsert subject
+  await db
+    .insertInto("subjects")
+    .values({
+      id: userId,
+      type: "user",
+      clerk_id: clerkId,
+      email,
+      display_name: displayName,
+    })
+    .onConflict((oc) =>
+      oc.column("id").doUpdateSet({
+        email,
+        display_name: displayName,
+      })
+    )
+    .execute();
+
+  return { id: userId, clerkId, email, displayName };
 }

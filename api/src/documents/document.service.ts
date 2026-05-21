@@ -1,4 +1,5 @@
 import { getDB } from "../db";
+import { uploadDocument } from "../s3";
 
 export class DocumentService {
   async listAccessible(userId: string, orgId: string) {
@@ -44,5 +45,90 @@ export class DocumentService {
   async getById(id: string) {
     const db = getDB();
     return db.selectFrom("documents").selectAll().where("id", "=", id).executeTakeFirst();
+  }
+
+  async setRules(documentId: string, rules: { subject_id: string; relation: string }[], grantedBy: string) {
+    const db = getDB();
+    await db.deleteFrom("document_rules").where("document_id", "=", documentId).execute();
+    if (rules.length === 0) return;
+    await db
+      .insertInto("document_rules")
+      .values(
+        rules.map((r) => ({
+          document_id: documentId,
+          subject_id: r.subject_id,
+          relation: r.relation as "reader" | "writer" | "owner",
+          granted_by: grantedBy,
+        }))
+      )
+      .execute();
+  }
+
+  async upsertWithContent(data: {
+    org_id: string;
+    owner_id: string;
+    vault_id: string;
+    obsidian_path: string;
+    title: string | null;
+    content: string;
+    content_hash: string;
+    rules: { subject_id: string; relation: string }[];
+  }) {
+    const db = getDB();
+    const existing = await db
+      .selectFrom("documents")
+      .selectAll()
+      .where("org_id", "=", data.org_id)
+      .where("vault_id", "=", data.vault_id)
+      .where("obsidian_path", "=", data.obsidian_path)
+      .where("owner_id", "=", data.owner_id)
+      .executeTakeFirst();
+
+    if (existing) {
+      // Update existing
+      await db
+        .updateTable("documents")
+        .set({
+          content_hash: data.content_hash,
+          title: data.title,
+          version: existing.version + 1,
+          updated_at: new Date(),
+        })
+        .where("id", "=", existing.id)
+        .execute();
+
+      await uploadDocument(existing.s3_key, data.content);
+      await this.setRules(existing.id, data.rules, data.owner_id);
+
+      // Delete old chunks, will be re-indexed separately
+      await db.deleteFrom("document_chunks").where("document_id", "=", existing.id).execute();
+
+      return existing.id;
+    }
+
+    const s3Key = `org_${data.org_id}/${data.vault_id}/${Buffer.from(data.obsidian_path).toString("base64url")}.md`;
+    const doc = await this.create({
+      org_id: data.org_id,
+      owner_id: data.owner_id,
+      s3_key: s3Key,
+      vault_id: data.vault_id,
+      obsidian_path: data.obsidian_path,
+      title: data.title,
+      content_hash: data.content_hash,
+    });
+
+    await uploadDocument(s3Key, data.content);
+    await this.setRules(doc.id, data.rules, data.owner_id);
+
+    return doc.id;
+  }
+
+  async getRules(documentId: string) {
+    const db = getDB();
+    return db
+      .selectFrom("document_rules")
+      .selectAll()
+      .where("document_id", "=", documentId)
+      .execute();
   }
 }

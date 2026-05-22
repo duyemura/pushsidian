@@ -32,5 +32,10 @@ minio-data/
 # Obsidian plugin build
 obsidian-plugin/*.js
 obsidian-plugin/*.css
-obsidian-plugin/main.js
-obsidian-plugin/styles.css
+
+# Keep root plugin files for BRAT
+!obsidian-plugin/main.js
+!obsidian-plugin/styles.css
+
+# Except release artifacts
+!obsidian-plugin/release/

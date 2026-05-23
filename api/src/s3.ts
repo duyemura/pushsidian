@@ -30,3 +30,13 @@ export async function getDocumentUrl(key: string) {
   });
   return getSignedUrl(s3, command, { expiresIn: 3600 });
 }
+
+export async function getDocumentContent(key: string): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+  });
+  const res = await s3.send(command);
+  if (!res.Body) throw new Error("Empty response from S3");
+  return res.Body.transformToString("utf-8");
+}

@@ -1,0 +1,42 @@
+name: Release Obsidian Plugin
+
+on:
+  push:
+    tags:
+      - "plugin-v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build plugin
+        run: cd obsidian-plugin && pnpm build
+
+      - name: Package release
+        run: |
+          mkdir -p release
+          cp obsidian-plugin/main.js release/main.js
+          cp obsidian-plugin/manifest.json release/manifest.json
+          cd release && zip -r ../pushsidian-plugin.zip .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pushsidian-plugin.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

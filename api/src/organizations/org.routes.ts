@@ -15,7 +15,7 @@ const routes: FastifyPluginAsyncZod = async (app) => {
           display_name: z.string().min(1).max(100),
         }),
         response: {
-          201: z.object({
+          200: z.object({
             id: z.string(),
             slug: z.string(),
             display_name: z.string(),
@@ -27,12 +27,12 @@ const routes: FastifyPluginAsyncZod = async (app) => {
     async (req, reply) => {
       const user = await verifyAuth(req);
       const body = req.body as { slug: string; display_name: string };
-      const org = await orgService.create({
+      const org = await orgService.createOrAttach({
         slug: body.slug,
         display_name: body.display_name,
         owner_id: user.id,
       });
-      reply.status(201);
+      reply.status(200);
       return {
         id: org.id,
         slug: org.slug,
@@ -158,6 +158,25 @@ const routes: FastifyPluginAsyncZod = async (app) => {
         display_name: g.display_name,
         slug: g.slug,
       }));
+    }
+  );
+
+  app.patch(
+    "/:id",
+    {
+      schema: {
+        params: z.object({ id: z.string() }),
+        body: z.object({
+          slack_webhook_url: z.string().url().optional(),
+        }),
+      },
+    },
+    async (req) => {
+      const user = await verifyAuth(req);
+      const { id } = req.params as { id: string };
+      const body = req.body as { slack_webhook_url?: string };
+      await orgService.update(id, user.id, body);
+      return { ok: true };
     }
   );
 };

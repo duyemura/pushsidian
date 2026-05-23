@@ -25,7 +25,7 @@ const routes: FastifyPluginAsyncZod = async (app) => {
         const email = data.email_addresses?.[0]?.email_address ?? "";
         const displayName = data.first_name
           ? `${data.first_name} ${data.last_name ?? ""}`.trim()
-          : email;
+          : data.username || email || "User";
 
         await db
           .insertInto("subjects")

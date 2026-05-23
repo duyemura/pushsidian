@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { promises as fs } from "fs";
 import { resolve } from "path";
 import { Kysely, PostgresDialect, sql } from "kysely";

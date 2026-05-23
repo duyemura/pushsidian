@@ -1,11 +1,12 @@
 import "dotenv/config";
 import fastify from "fastify";
 import cors from "@fastify/cors";
-import { clerkPlugin } from "@clerk/fastify";
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
 import documentRoutes from "./documents/document.routes";
 import orgRoutes from "./organizations/org.routes";
 import searchRoutes from "./search/search.routes";
+import apiKeyRoutes from "./api-keys/api-key.routes";
+import inviteRoutes from "./invites/invite.routes";
 import clerkWebhookRoutes from "./webhooks/clerk.routes";
 import userRoutes from "./user.routes";
 
@@ -18,13 +19,20 @@ async function main() {
   app.setSerializerCompiler(serializerCompiler);
 
   await app.register(cors, {
-    origin: ["http://localhost:5173", "app://obsidian.md"],
+    origin: ["http://localhost:5173", "http://localhost:5175", "app://obsidian.md"],
     credentials: true,
   });
 
-  await app.register(clerkPlugin, {
-    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
-    secretKey: process.env.CLERK_SECRET_KEY,
+  app.setErrorHandler((err, req, reply) => {
+    if (err instanceof Error && err.message === "Unauthorized") {
+      const isDev = process.env.NODE_ENV !== "production";
+      return reply.status(401).send({
+        statusCode: 401,
+        error: "Unauthorized",
+        message: isDev && (err as any).cause ? String((err as any).cause) : "Invalid or missing token",
+      });
+    }
+    reply.send(err);
   });
 
   app.get("/health", async () => ({ status: "ok" }));
@@ -32,6 +40,8 @@ async function main() {
   await app.register(documentRoutes, { prefix: "/api/documents" });
   await app.register(orgRoutes, { prefix: "/api/orgs" });
   await app.register(searchRoutes, { prefix: "/api/search" });
+  await app.register(apiKeyRoutes, { prefix: "/api/keys" });
+  await app.register(inviteRoutes, { prefix: "/api/invites" });
   await app.register(userRoutes, { prefix: "/api/user" });
   await app.register(clerkWebhookRoutes, { prefix: "/webhooks" });
 

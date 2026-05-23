@@ -13,6 +13,7 @@ export interface Organizations {
   slug: string;
   display_name: string;
   owner_id: string;
+  slack_webhook_url: string | null;
   created_at: Date;
 }
 
@@ -72,13 +73,26 @@ export interface DocumentChunks {
 export interface InviteTokens {
   id: string;
   org_id: string;
-  email: string;
+  email: string | null;
+  slack_handle: string | null;
+  slack_user_id: string | null;
   groups: string[] | null;
   role: string;
   token: string;
   used_by: string | null;
   used_at: Date | null;
+  created_by: string | null;
   expires_at: Date;
+  created_at: Date;
+}
+
+export interface ApiKeys {
+  id: string;
+  user_id: string;
+  org_id: string;
+  key_hash: string;
+  label: string | null;
+  last_used_at: Date | null;
   created_at: Date;
 }
 
@@ -97,5 +111,6 @@ export interface DB {
   document_rules: DocumentRules;
   document_chunks: DocumentChunks;
   invite_tokens: InviteTokens;
+  api_keys: ApiKeys;
   migrations: Migrations;
 }

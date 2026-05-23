@@ -7,6 +7,31 @@ const orgService = new OrgService();
 
 const routes: FastifyPluginAsyncZod = async (app) => {
   app.get(
+    "/me",
+    {
+      schema: {
+        response: {
+          200: z.object({
+            id: z.string(),
+            clerk_id: z.string(),
+            email: z.string(),
+            display_name: z.string(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const user = await verifyAuth(req);
+      return {
+        id: user.id,
+        clerk_id: user.clerkId,
+        email: user.email,
+        display_name: user.displayName,
+      };
+    }
+  );
+
+  app.get(
     "/orgs",
     {
       schema: {

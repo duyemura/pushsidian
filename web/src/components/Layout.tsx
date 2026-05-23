@@ -17,6 +17,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link to="/team" className="text-sm text-gray-600 hover:text-gray-900">
                 Team
               </Link>
+              <Link to="/profile" className="text-sm text-gray-600 hover:text-gray-900">
+                Profile
+              </Link>
             </div>
             <div className="flex items-center">
               <UserButton />

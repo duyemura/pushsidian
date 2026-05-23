@@ -13,6 +13,8 @@
   "dependencies": {
     "@clerk/clerk-react": "^5.0.0",
     "@pushsidian/shared-types": "workspace:*",
+    "@tailwindcss/typography": "^0.5.19",
+    "marked": "^18.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.0.0",

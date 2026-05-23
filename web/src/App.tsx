@@ -3,6 +3,10 @@ import { SignedIn, SignedOut, SignIn, SignUp } from "@clerk/clerk-react";
 import AuthGuard from "./components/AuthGuard";
 import Dashboard from "./pages/Dashboard";
 import TeamSettings from "./pages/TeamSettings";
+import Onboarding from "./pages/Onboarding";
+import DocumentViewer from "./pages/DocumentViewer";
+import Profile from "./pages/Profile";
+import JoinPage from "./pages/JoinPage";
 import Layout from "./components/Layout";
 
 function App() {
@@ -24,6 +28,17 @@ function App() {
           </div>
         }
       />
+      <Route path="/join" element={<JoinPage />} />
+      <Route
+        path="/onboarding"
+        element={
+          <SignedIn>
+            <AuthGuard>
+              <Onboarding />
+            </AuthGuard>
+          </SignedIn>
+        }
+      />
       <Route
         path="/*"
         element={
@@ -39,6 +54,8 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/team" element={<TeamSettings />} />
+                    <Route path="/docs/:id" element={<DocumentViewer />} />
+                    <Route path="/profile" element={<Profile />} />
                   </Routes>
                 </Layout>
               </AuthGuard>

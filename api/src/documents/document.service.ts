@@ -2,12 +2,12 @@ import { getDB } from "../db";
 import { uploadDocument } from "../s3";
 
 export class DocumentService {
-  async listAccessible(userId: string, orgId: string) {
+  async listAccessible(userId: string, orgId: string, ownerId?: string) {
     const db = getDB();
 
-    const docs = await db
+    let query = db
       .selectFrom("documents")
-      .innerJoin("document_rules", "documents.id", "document_rules.document_id")
+      .leftJoin("document_rules", "documents.id", "document_rules.document_id")
       .leftJoin("group_memberships", "document_rules.subject_id", "group_memberships.group_id")
       .where("documents.org_id", "=", orgId)
       .where("documents.is_deleted", "=", false)
@@ -15,12 +15,15 @@ export class DocumentService {
         eb.or([
           eb("document_rules.subject_id", "=", userId),
           eb("group_memberships.user_id", "=", userId),
+          eb("documents.owner_id", "=", userId),
         ])
-      )
-      .selectAll("documents")
-      .distinct()
-      .execute();
+      );
 
+    if (ownerId) {
+      query = query.where("documents.owner_id", "=", ownerId);
+    }
+
+    const docs = await query.selectAll("documents").distinct().execute();
     return docs;
   }
 
@@ -54,14 +57,48 @@ export class DocumentService {
     return db.selectFrom("documents").selectAll().where("id", "=", id).executeTakeFirst();
   }
 
-  async setRules(documentId: string, rules: { subject_id: string; relation: string }[], grantedBy: string) {
+  async setRules(
+    documentId: string,
+    rules: { subject_id: string; relation: string }[],
+    grantedBy: string,
+    orgId: string
+  ) {
     const db = getDB();
+
+    // Resolve slugs like "everyone" to actual group IDs
+    const resolved = await Promise.all(
+      rules.map(async (r) => {
+        // User IDs
+        if (r.subject_id.startsWith("user_")) {
+          return r;
+        }
+        // Group IDs: grp_ prefix or raw UUID (backward compat)
+        if (r.subject_id.startsWith("grp_") || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.subject_id)) {
+          return r;
+        }
+        // Try resolving as a group slug in this org
+        const group = await db
+          .selectFrom("groups")
+          .select("id")
+          .where("org_id", "=", orgId)
+          .where("slug", "=", r.subject_id)
+          .executeTakeFirst();
+        if (group) {
+          return { ...r, subject_id: group.id };
+        }
+        console.warn(`[Pushsidian] Could not resolve share rule for subject_id: ${r.subject_id}`);
+        return null;
+      })
+    );
+
+    const validRules = resolved.filter(Boolean) as { subject_id: string; relation: string }[];
+
     await db.deleteFrom("document_rules").where("document_id", "=", documentId).execute();
-    if (rules.length === 0) return;
+    if (validRules.length === 0) return;
     await db
       .insertInto("document_rules")
       .values(
-        rules.map((r) => ({
+        validRules.map((r) => ({
           document_id: documentId,
           subject_id: r.subject_id,
           relation: r.relation as "reader" | "writer" | "owner",
@@ -105,7 +142,7 @@ export class DocumentService {
         .execute();
 
       await uploadDocument(existing.s3_key, data.content);
-      await this.setRules(existing.id, data.rules, data.owner_id);
+      await this.setRules(existing.id, data.rules, data.owner_id, data.org_id);
       await db.deleteFrom("document_chunks").where("document_id", "=", existing.id).execute();
 
       return existing.id;
@@ -123,7 +160,7 @@ export class DocumentService {
     });
 
     await uploadDocument(s3Key, data.content);
-    await this.setRules(doc.id, data.rules, data.owner_id);
+    await this.setRules(doc.id, data.rules, data.owner_id, data.org_id);
 
     return doc.id;
   }
@@ -135,5 +172,26 @@ export class DocumentService {
       .selectAll()
       .where("document_id", "=", documentId)
       .execute();
+  }
+
+  async canAccess(userId: string, documentId: string) {
+    const db = getDB();
+    const accessible = await db
+      .selectFrom("documents")
+      .leftJoin("document_rules", "documents.id", "document_rules.document_id")
+      .leftJoin("group_memberships", "document_rules.subject_id", "group_memberships.group_id")
+      .where("documents.id", "=", documentId)
+      .where("documents.is_deleted", "=", false)
+      .where((eb) =>
+        eb.or([
+          eb("document_rules.subject_id", "=", userId),
+          eb("group_memberships.user_id", "=", userId),
+          eb("documents.owner_id", "=", userId),
+        ])
+      )
+      .select("documents.id")
+      .distinct()
+      .executeTakeFirst();
+    return !!accessible;
   }
 }

@@ -95,7 +95,7 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       const members = await orgService.listMembers(id);
       return members.map((m) => ({
         id: m.id,
-        display_name: m.display_name,
+        display_name: m.display_name?.trim() || m.email?.split("@")[0] || "Unknown",
         email: m.email,
         role: m.role,
         created_at: m.created_at.toISOString(),

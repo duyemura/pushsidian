@@ -3,11 +3,6 @@ name: API CI/CD
 on:
   push:
     branches: [main]
-    paths:
-      - "api/**"
-      - ".github/workflows/api.yml"
-      - "Dockerfile"
-      - "railway.json"
   pull_request:
     branches: [main]
     paths:

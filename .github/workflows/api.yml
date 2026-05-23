@@ -33,6 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm install -g @railway/cli
-      - run: railway up
+      - run: railway up --service "magnificent-warmth"
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

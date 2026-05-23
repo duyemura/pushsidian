@@ -7,7 +7,7 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 # Copy workspace files
-COPY pnpm-workspace.yaml package.json ./
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY api/package.json api/
 COPY web/package.json web/
 COPY obsidian-plugin/package.json obsidian-plugin/
@@ -42,7 +42,7 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 # Copy workspace files
-COPY pnpm-workspace.yaml package.json ./
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY api/package.json api/
 COPY packages/shared-types/package.json packages/shared-types/
 

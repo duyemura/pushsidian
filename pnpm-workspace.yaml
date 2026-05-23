@@ -3,3 +3,8 @@ packages:
   - "web"
   - "obsidian-plugin"
   - "packages/*"
+
+settings:
+  onlyBuiltDependencies:
+    - "@clerk/shared"
+    - esbuild

@@ -12,8 +12,5 @@
   },
   "devDependencies": {
     "typescript": "^5.9.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": []
   }
 }

@@ -3,6 +3,7 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { DocumentService } from "./document.service";
 import { verifyAuth } from "../auth";
 import { getDB } from "../db";
+import { slackService } from "../slack/slack.service";
 
 const documentService = new DocumentService();
 
@@ -133,6 +134,23 @@ const routes: FastifyPluginAsyncZod = async (app) => {
         content_hash: string;
         rules: { subject_id: string; relation: string }[];
       };
+
+      // Find existing doc to know old rules before upsert
+      const db = getDB();
+      const existingDoc = await db
+        .selectFrom("documents")
+        .select("id")
+        .where("org_id", "=", body.org_id)
+        .where("vault_id", "=", body.vault_id)
+        .where("obsidian_path", "=", body.obsidian_path)
+        .where("owner_id", "=", user.id)
+        .executeTakeFirst();
+
+      const oldRules = existingDoc
+        ? await documentService.getRules(existingDoc.id)
+        : [];
+      const oldSubjectIds = new Set(oldRules.map((r) => r.subject_id));
+
       const docId = await documentService.upsertWithContent({
         org_id: body.org_id,
         owner_id: user.id,
@@ -143,6 +161,35 @@ const routes: FastifyPluginAsyncZod = async (app) => {
         content_hash: body.content_hash,
         rules: body.rules,
       });
+
+      // Notify newly added individual users via Slack DM
+      const newlyAdded = body.rules.filter(
+        (r) => !oldSubjectIds.has(r.subject_id) && r.subject_id.startsWith("user_")
+      );
+
+      if (newlyAdded.length > 0) {
+        const subjectIds = newlyAdded.map((r) => r.subject_id);
+        const subjects = await db
+          .selectFrom("subjects")
+          .select(["id", "email", "display_name"])
+          .where("id", "in", subjectIds)
+          .execute();
+
+        const baseUrl = process.env.APP_BASE_URL || "http://localhost:5175";
+        const docTitle = body.title || body.obsidian_path.split("/").pop() || "a note";
+        const ownerName = user.displayName || "Someone";
+
+        for (const subject of subjects) {
+          if (!subject.email) continue;
+          const slackUserId = await slackService.resolveHandle(subject.email);
+          if (!slackUserId) continue;
+
+          void slackService.sendDM(
+            slackUserId,
+            `*${ownerName}* shared a note with you: *${docTitle}*\n\nView it here: ${baseUrl}/docs/${docId}`
+          );
+        }
+      }
 
       reply.status(201);
       return { id: docId };
@@ -215,6 +262,7 @@ const routes: FastifyPluginAsyncZod = async (app) => {
           200: z.array(
             z.object({
               subject_id: z.string(),
+              display_name: z.string(),
               relation: z.string(),
             })
           ),
@@ -222,11 +270,43 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (req) => {
-      await verifyAuth(req);
+      const user = await verifyAuth(req);
       const { id } = req.params as { id: string };
+      const canAccess = await documentService.canAccess(user.id, id);
+      if (!canAccess) throw new Error("Unauthorized");
+
       const rules = await documentService.getRules(id);
+      const subjectIds = [...new Set(rules.map((r) => r.subject_id))];
+
+      const db = getDB();
+      let names: { id: string; display_name: string }[] = [];
+      if (subjectIds.length > 0) {
+        // Try subjects table first (users + groups)
+        names = await db
+          .selectFrom("subjects")
+          .select(["id", "display_name"])
+          .where("id", "in", subjectIds)
+          .execute();
+
+        // Fill in any missing (e.g. "everyone" group not in subjects)
+        const everyoneGroup = await db
+          .selectFrom("groups")
+          .select(["id", "display_name"])
+          .where("id", "in", subjectIds)
+          .execute();
+        for (const g of everyoneGroup) {
+          if (!names.find((n) => n.id === g.id)) {
+            names.push({ id: g.id, display_name: g.display_name });
+          }
+        }
+      }
+
+      const nameById = new Map(names.map((n) => [n.id, n.display_name]));
+
       return rules.map((r) => ({
         subject_id: r.subject_id,
+        display_name:
+          nameById.get(r.subject_id) || r.subject_id.split("_").pop()?.slice(0, 8) || r.subject_id,
         relation: r.relation,
       }));
     }

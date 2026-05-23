@@ -12,11 +12,18 @@ interface DocumentMeta {
   updated_at: string;
 }
 
+interface DocRule {
+  subject_id: string;
+  display_name: string;
+  relation: string;
+}
+
 export default function DocumentViewer() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [meta, setMeta] = useState<DocumentMeta | null>(null);
   const [content, setContent] = useState<string>("");
+  const [rules, setRules] = useState<DocRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,8 +32,12 @@ export default function DocumentViewer() {
 
     (async () => {
       try {
-        const doc = await fetchWithAuth(`/api/documents/${id}`);
+        const [doc, rulesData] = await Promise.all([
+          fetchWithAuth(`/api/documents/${id}`),
+          fetchWithAuth(`/api/documents/${id}/rules`).catch(() => []),
+        ]);
         setMeta(doc);
+        setRules(rulesData);
 
         const token = window.localStorage.getItem("clerk-token");
         const contentRes = await fetch(`/api/documents/${id}/content`, {
@@ -73,13 +84,21 @@ export default function DocumentViewer() {
             </h1>
             <p className="text-sm text-gray-500 font-mono mt-1">{meta.obsidian_path}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              v{meta.version}
-            </span>
-            <span className="text-sm text-gray-500">
-              {new Date(meta.updated_at).toLocaleDateString()}
-            </span>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                v{meta.version}
+              </span>
+              <span className="text-sm text-gray-500">
+                {new Date(meta.updated_at).toLocaleDateString()}
+              </span>
+            </div>
+            {rules.length > 0 && (
+              <div className="text-xs text-gray-500">
+                Shared with:{" "}
+                {rules.map((r) => r.display_name).join(", ")}
+              </div>
+            )}
           </div>
         </div>
 

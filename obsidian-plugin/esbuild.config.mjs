@@ -5,9 +5,6 @@ import builtins from "builtin-modules";
 const prod = process.argv[2] === "production";
 
 const context = await esbuild.context({
-  banner: {
-    js: "import { createRequire } from 'module';const require = createRequire(import.meta.url);",
-  },
   entryPoints: ["src/main.ts"],
   bundle: true,
   external: [
@@ -20,7 +17,8 @@ const context = await esbuild.context({
     ...builtins,
   ],
   format: "cjs",
-  target: "es2022",
+  platform: "node",
+  target: "es2018",
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,

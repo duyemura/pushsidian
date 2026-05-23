@@ -11,6 +11,7 @@ COPY pnpm-workspace.yaml package.json ./
 COPY api/package.json api/
 COPY web/package.json web/
 COPY obsidian-plugin/package.json obsidian-plugin/
+COPY packages/shared-types/package.json packages/shared-types/
 
 # Install dependencies
 RUN pnpm install
@@ -18,6 +19,10 @@ RUN pnpm install
 # Copy source
 COPY api/ api/
 COPY web/ web/
+COPY packages/shared-types/ packages/shared-types/
+
+# Build shared-types first (workspace dependency)
+RUN cd packages/shared-types && pnpm build
 
 # Build web app
 RUN cd web && pnpm build
@@ -39,6 +44,7 @@ RUN npm install -g pnpm
 # Copy workspace files
 COPY pnpm-workspace.yaml package.json ./
 COPY api/package.json api/
+COPY packages/shared-types/package.json packages/shared-types/
 
 # Install production deps only
 RUN pnpm install --prod
@@ -47,6 +53,7 @@ RUN pnpm install --prod
 COPY --from=builder /app/api/dist api/dist/
 COPY --from=builder /app/api/public api/public/
 COPY --from=builder /app/api/src/db/migrations api/src/db/migrations/
+COPY --from=builder /app/packages/shared-types/dist packages/shared-types/dist/
 
 WORKDIR /app/api
 

@@ -47,11 +47,12 @@ export async function verifyAuth(req: FastifyRequest): Promise<CurrentUser> {
     });
 
     const clerkId = payload.sub as string;
-    const email = (payload.email as string) ?? "";
-    const displayName =
-      (payload.firstName as string)
-        ? `${payload.firstName} ${(payload.lastName as string) ?? ""}`.trim()
-        : email;
+    const email = (payload.email as string) ?? (payload.email_address as string) ?? "";
+    const firstName = (payload.first_name as string) ?? (payload.firstName as string) ?? "";
+    const lastName = (payload.last_name as string) ?? (payload.lastName as string) ?? "";
+    const displayName = firstName
+      ? `${firstName} ${lastName}`.trim()
+      : email || clerkId.slice(0, 8);
 
     const db = getDB();
     const userId = `user_${clerkId}`;

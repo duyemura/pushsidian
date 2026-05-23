@@ -4,6 +4,7 @@ export interface Subjects {
   clerk_id: string | null;
   email: string | null;
   display_name: string;
+  slack_handle: string | null;
   avatar_url: string | null;
   created_at: Date;
 }

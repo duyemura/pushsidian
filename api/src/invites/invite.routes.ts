@@ -111,6 +111,15 @@ const routes: FastifyPluginAsyncZod = async (app) => {
         .executeTakeFirst();
 
       if (invite) {
+        // Copy slack_handle from invite to user's subject record
+        if (invite.slack_handle) {
+          await db
+            .updateTable("subjects")
+            .set({ slack_handle: invite.slack_handle })
+            .where("id", "=", user.id)
+            .execute();
+        }
+
         let invitedByName: string | null = null;
         if (invite.created_by) {
           const inviter = await db

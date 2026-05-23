@@ -106,7 +106,7 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       const db = getDB();
       const invite = await db
         .selectFrom("invite_tokens")
-        .select(["org_id", "created_by"])
+        .select(["org_id", "created_by", "slack_handle"])
         .where("token", "=", token)
         .executeTakeFirst();
 

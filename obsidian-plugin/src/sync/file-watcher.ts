@@ -1,17 +1,34 @@
-import { TFile, MetadataCache } from "obsidian";
+import { TFile, MetadataCache, Notice } from "obsidian";
 import type PushsidianPlugin from "../main";
+import { ShareModal } from "../ui/share-modal";
 
 interface FileCacheEntry {
   contentHash: string;
   lastSyncAt: number;
 }
 
+interface Member {
+  id: string;
+  display_name: string;
+}
+
 export class FileWatcher {
   private cache: Map<string, FileCacheEntry> = new Map();
   private syncQueue: Set<string> = new Set();
   private syncTimer: number | null = null;
+  private memberCache: { members: Member[]; fetchedAt: number } | null = null;
 
   constructor(private plugin: PushsidianPlugin) {}
+
+  private async getMembers(): Promise<Member[]> {
+    const now = Date.now();
+    if (this.memberCache && now - this.memberCache.fetchedAt < 5 * 60 * 1000) {
+      return this.memberCache.members;
+    }
+    const members = await this.plugin.api.getOrgMembers(this.plugin.settings.orgId);
+    this.memberCache = { members, fetchedAt: now };
+    return members;
+  }
 
   async onFileChange(file: TFile) {
     if (!this.plugin.settings.syncEnabled) return;
@@ -19,11 +36,21 @@ export class FileWatcher {
     if (!this.plugin.settings.orgId) return;
 
     const cache = this.plugin.app.metadataCache.getFileCache(file);
-    if (!cache?.frontmatter?.share) return;
+    const shareValue = cache?.frontmatter?.share;
+    const hasShare = !!shareValue;
 
-    // Queue for debounced sync
-    this.syncQueue.add(file.path);
-    this.scheduleSync();
+    // Run mention detection on ALL markdown files, even ones not yet shared
+    if (file.extension === "md") {
+      const content = await this.plugin.app.vault.read(file);
+      const rules = shareValue ? await this.buildRules(shareValue) : [];
+      void this.checkMentions(file, content, rules);
+    }
+
+    // Only queue sync for shared files
+    if (hasShare) {
+      this.syncQueue.add(file.path);
+      this.scheduleSync();
+    }
   }
 
   private scheduleSync() {
@@ -55,7 +82,7 @@ export class FileWatcher {
 
       const cache = this.plugin.app.metadataCache.getFileCache(file);
       const share = cache?.frontmatter?.share;
-      const rules = this.buildRules(share);
+      const rules = await this.buildRules(share);
 
       await this.plugin.api.uploadDocument({
         org_id: this.plugin.settings.orgId,
@@ -74,16 +101,79 @@ export class FileWatcher {
     }
   }
 
-  private buildRules(share: string | string[]): { subject_id: string; relation: string }[] {
+  private async checkMentions(file: TFile, content: string, rules: { subject_id: string }[]) {
+    const mentionRegex = /@([A-Za-z0-9_]{2,40})/g;
+    const mentions = new Set<string>();
+    let match;
+    while ((match = mentionRegex.exec(content)) !== null) {
+      mentions.add(match[1].trim().toLowerCase());
+    }
+    if (mentions.size === 0) return;
+
+    try {
+      const members = await this.getMembers();
+      const currentSubjects = new Set(rules.map((r) => r.subject_id));
+      const pending: string[] = [];
+      const mentionWords = Array.from(mentions);
+
+      for (const member of members) {
+        if (!member.display_name?.trim()) continue;
+        const nameLower = member.display_name.toLowerCase();
+        const nameTokens = nameLower.split(/\s+/);
+        const isMentioned = mentionWords.some(
+          (m) => nameLower === m || nameTokens.includes(m)
+        );
+        if (isMentioned && !currentSubjects.has(member.id)) {
+          pending.push(member.id);
+        }
+      }
+
+      if (pending.length > 0) {
+        // Merge with any existing pending mentions so state accumulates
+        const existing = (this.plugin as any).__pendingMentions || [];
+        const merged = Array.from(new Set([...existing, ...pending]));
+        (this.plugin as any).__pendingMentions = merged;
+
+        // Skip if we just saved (processFrontMatter triggers a file change)
+        const grace = (this.plugin as any).__shareSaveGrace;
+        if (grace && Date.now() - grace < 2000) return;
+
+        // Open the share modal directly with pending pre-checked
+        // (skip if already open to avoid stacking modals)
+        if (!(this.plugin as any).__shareModalOpen) {
+          (this.plugin as any).__shareModalOpen = true;
+          const modal = new ShareModal(this.plugin.app, this.plugin, file, merged);
+          modal.open();
+        }
+      }
+    } catch {
+      // Silently fail mention detection
+    }
+  }
+
+  private async buildRules(share: boolean | string | string[]): Promise<{ subject_id: string; relation: string }[]> {
+    if (share === true) {
+      return [{ subject_id: "everyone", relation: "reader" }];
+    }
     const items = Array.isArray(share) ? share : [share];
-    // Phase 1: map slugs to subject_ids via API lookup (not implemented yet)
-    // For now, assume items are subject_ids prefixed with group_ or user_
+    const members = await this.getMembers();
+
     return items
       .filter((s) => typeof s === "string")
-      .map((s) => ({
-        subject_id: String(s),
-        relation: "reader" as const,
-      }));
+      .map((s) => {
+        const lower = s.toLowerCase();
+        if (lower === "everyone") {
+          return { subject_id: "everyone", relation: "reader" as const };
+        }
+        // Resolve display name to member ID
+        const member = members.find((m) => m.display_name?.toLowerCase() === lower);
+        if (member) {
+          return { subject_id: member.id, relation: "reader" as const };
+        }
+        console.warn(`[Pushsidian] Could not resolve share target "${s}" to a member — sharing rule will be skipped.`);
+        // Fallback: treat as raw ID (backward compat)
+        return { subject_id: s, relation: "reader" as const };
+      });
   }
 
   private async sha256(content: string): Promise<string> {

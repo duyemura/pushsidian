@@ -5,39 +5,66 @@ interface RemoteDocument {
   id: string;
   obsidian_path: string;
   title: string | null;
+  owner_id: string;
+  owner_name: string;
+  org_name: string;
   version: number;
   updated_at: string;
 }
 
+interface DownloadCacheEntry {
+  version: number;
+  syncedAt: number;
+}
+
 export class Downloader {
+  private cache: Map<string, DownloadCacheEntry> = new Map();
+  private userId: string | null = null;
+
   constructor(private plugin: PushsidianPlugin) {}
+
+  private async ensureUserId(): Promise<string | null> {
+    if (this.userId) return this.userId;
+    try {
+      const user = await this.plugin.api.getUser();
+      this.userId = user.id;
+      return this.userId;
+    } catch {
+      return null;
+    }
+  }
 
   async syncSharedDocuments() {
     if (!this.plugin.settings.syncEnabled) return;
     if (!this.plugin.settings.apiKey) return;
     if (!this.plugin.settings.orgId) return;
 
+    const currentUserId = await this.ensureUserId();
+    if (!currentUserId) {
+      console.warn("[Pushsidian] Cannot sync: failed to resolve current user");
+      return;
+    }
+
     try {
       const docs: RemoteDocument[] = await this.plugin.api.getDocuments(this.plugin.settings.orgId);
-      const vaultName = this.plugin.app.vault.getName();
 
       for (const doc of docs) {
         // Skip own documents (they're already in the vault)
-        if (doc.obsidian_path.startsWith(".pushsidian/")) continue;
+        if (doc.owner_id === currentUserId) continue;
 
-        const targetPath = `.pushsidian/shared/${doc.id}/${doc.obsidian_path}`;
+        const cached = this.cache.get(doc.id);
+        if (cached && cached.version >= doc.version) continue;
+
+        const orgSlug = (doc.org_name || "Shared").replace(/[^a-zA-Z0-9\s-]/g, "").trim();
+        const ownerSlug = (doc.owner_name || "unknown").replace(/[^a-zA-Z0-9\s-]/g, "").trim();
+        const targetPath = `${orgSlug}/${ownerSlug}/${doc.obsidian_path}`;
         const normalized = normalizePath(targetPath);
         const existing = this.plugin.app.vault.getAbstractFileByPath(normalized);
 
-        // Fetch content URL
-        const metaRes = await fetch(`${this.plugin.api.baseUrl}/api/documents/${doc.id}`, {
+        // Fetch content through API proxy (avoids CORS on pre-signed R2 URLs)
+        const contentRes = await fetch(`${this.plugin.api.baseUrl}/api/documents/${doc.id}/content`, {
           headers: this.plugin.api.headers,
         });
-        if (!metaRes.ok) continue;
-        const meta = await metaRes.json();
-
-        // Fetch actual content
-        const contentRes = await fetch(meta.content_url);
         if (!contentRes.ok) continue;
         const content = await contentRes.text();
 
@@ -47,6 +74,9 @@ export class Downloader {
           await this.ensureDirectory(normalized);
           await this.plugin.app.vault.create(normalized, content);
         }
+
+        this.cache.set(doc.id, { version: doc.version, syncedAt: Date.now() });
+        console.log(`[Pushsidian] Downloaded shared doc: ${doc.obsidian_path} (v${doc.version})`);
       }
     } catch (err) {
       console.error("[Pushsidian] Failed to sync shared docs:", err);
@@ -64,5 +94,13 @@ export class Downloader {
         await this.plugin.app.vault.createFolder(current);
       }
     }
+  }
+
+  loadCache(data: Record<string, DownloadCacheEntry>) {
+    this.cache = new Map(Object.entries(data));
+  }
+
+  saveCache(): Record<string, DownloadCacheEntry> {
+    return Object.fromEntries(this.cache);
   }
 }

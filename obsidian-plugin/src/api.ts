@@ -40,6 +40,14 @@ export class PushsidianAPI {
     return res.json();
   }
 
+  async getUser() {
+    const res = await fetch(`${this.baseUrl}/api/user/me`, {
+      headers: this.headers,
+    });
+    if (!res.ok) throw new Error(`Failed to fetch user: ${res.status}`);
+    return res.json();
+  }
+
   async search(query: string, orgId: string) {
     const res = await fetch(`${this.baseUrl}/api/search`, {
       method: "POST",
@@ -47,6 +55,14 @@ export class PushsidianAPI {
       body: JSON.stringify({ query, org_id: orgId }),
     });
     if (!res.ok) throw new Error(`Failed to search: ${res.status}`);
+    return res.json();
+  }
+
+  async getOrgMembers(orgId: string) {
+    const res = await fetch(`${this.baseUrl}/api/orgs/${encodeURIComponent(orgId)}/members`, {
+      headers: this.headers,
+    });
+    if (!res.ok) throw new Error(`Failed to fetch members: ${res.status}`);
     return res.json();
   }
 }

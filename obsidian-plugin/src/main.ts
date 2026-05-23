@@ -1,7 +1,9 @@
-import { Plugin, TFile, Notice, Modal, App, Setting, ItemView, WorkspaceLeaf } from "obsidian";
+import { Plugin, TFile, Notice, Modal, App, Setting, ItemView, WorkspaceLeaf, PluginSettingTab } from "obsidian";
 import { PushsidianAPI } from "./api";
 import { FileWatcher } from "./sync/file-watcher";
 import { Downloader } from "./sync/downloader";
+import { ShareModal } from "./ui/share-modal";
+import { SetupModal } from "./ui/setup-modal";
 
 const VIEW_TYPE_TEAM = "pushsidian-team-panel";
 
@@ -18,28 +20,6 @@ const DEFAULT_SETTINGS: PushsidianSettings = {
   orgId: "",
   syncEnabled: true,
 };
-
-class ShareModal extends Modal {
-  constructor(app: App) {
-    super(app);
-  }
-
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.createEl("h2", { text: "Share Note" });
-    contentEl.createEl("p", { text: "Share this note with your team." });
-    new Setting(contentEl).addButton((btn) =>
-      btn.setButtonText("Share").setCta().onClick(() => {
-        new Notice("Sharing not yet implemented");
-        this.close();
-      })
-    );
-  }
-
-  onClose() {
-    this.contentEl.empty();
-  }
-}
 
 class TeamPanelView extends ItemView {
   constructor(leaf: WorkspaceLeaf) {
@@ -74,15 +54,28 @@ export default class PushsidianPlugin extends Plugin {
     this.fileWatcher = new FileWatcher(this);
     this.downloader = new Downloader(this);
 
+    if (!this.settings.apiKey) {
+      new SetupModal(this.app, this).open();
+    }
+
     this.addRibbonIcon("share", "Share note", () => {
-      new ShareModal(this.app).open();
+      const file = this.app.workspace.getActiveFile();
+      if (file) {
+        const pending = (this as any).__pendingMentions || [];
+        new ShareModal(this.app, this, file, pending).open();
+      } else {
+        new Notice("No file is currently open");
+      }
     });
 
     this.addCommand({
       id: "share-note",
       name: "Share current note",
-      editorCallback: () => {
-        new ShareModal(this.app).open();
+      editorCallback: (editor, ctx) => {
+        if (ctx.file) {
+          const pending = (this as any).__pendingMentions || [];
+          new ShareModal(this.app, this, ctx.file, pending).open();
+        }
       },
     });
 
@@ -129,7 +122,8 @@ export default class PushsidianPlugin extends Plugin {
 
   async activateView() {
     const { workspace } = this.app;
-    let leaf = workspace.getLeavesOfType(VIEW_TYPE_TEAM)[0];
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_TEAM);
+    let leaf = leaves.length > 0 ? leaves[0] : null;
     if (!leaf) {
       leaf = workspace.getRightLeaf(false);
       if (leaf) await leaf.setViewState({ type: VIEW_TYPE_TEAM, active: true });
@@ -143,21 +137,23 @@ export default class PushsidianPlugin extends Plugin {
     const data = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings);
     this.fileWatcher?.loadCache(data?.syncCache ?? {});
+    this.downloader?.loadCache(data?.downloadCache ?? {});
   }
 
   async saveSettings() {
     await this.saveData({
       settings: this.settings,
       syncCache: this.fileWatcher?.saveCache() ?? {},
+      downloadCache: this.downloader?.saveCache() ?? {},
     });
   }
 }
 
-class PushsidianSettingTab extends Plugin {
+class PushsidianSettingTab extends PluginSettingTab {
   plugin: PushsidianPlugin;
 
   constructor(app: App, plugin: PushsidianPlugin) {
-    super(app, plugin.manifest);
+    super(app, plugin);
     this.plugin = plugin;
   }
 

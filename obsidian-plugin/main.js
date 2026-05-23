@@ -24,7 +24,7 @@ __export(main_exports, {
   default: () => PushsidianPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian4 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // src/api.ts
 var PushsidianAPI = class {
@@ -446,6 +446,83 @@ var Downloader = class {
   }
 };
 
+// src/ui/setup-modal.ts
+var import_obsidian4 = require("obsidian");
+var SetupModal = class extends import_obsidian4.Modal {
+  constructor(app, plugin) {
+    super(app);
+    __publicField(this, "plugin");
+    __publicField(this, "apiKeyInput");
+    __publicField(this, "saveButton");
+    __publicField(this, "statusEl");
+    this.plugin = plugin;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("pushsidian-setup-modal");
+    contentEl.createEl("h2", { text: "Welcome to Pushsidian" });
+    contentEl.createEl("p", {
+      text: "Pushsidian lets you share notes with your team and tap into shared knowledge using AI."
+    });
+    const steps = contentEl.createEl("ol", { cls: "pushsidian-setup-steps" });
+    steps.createEl("li", { text: "Your notes stay in Obsidian \u2014 nothing changes locally." });
+    steps.createEl("li", { text: "Add share: [team] to any note to share it with your team." });
+    steps.createEl("li", { text: "Your team can read shared notes in their vault or on the web." });
+    contentEl.createEl("p", {
+      text: "To get started, paste your API key below. You can find it in the web app under your profile.",
+      cls: "pushsidian-setup-hint"
+    });
+    new import_obsidian4.Setting(contentEl).setName("API key").setDesc("Looks like psk_...").addText((text) => {
+      text.setPlaceholder("psk_...");
+      this.apiKeyInput = text.inputEl;
+      this.apiKeyInput.type = "password";
+      text.onChange(() => this.updateSaveState());
+    });
+    this.statusEl = contentEl.createEl("div", { cls: "pushsidian-setup-status" });
+    const btnRow = contentEl.createEl("div", { cls: "pushsidian-setup-buttons" });
+    this.saveButton = btnRow.createEl("button", {
+      text: "Save and connect",
+      cls: "mod-cta"
+    });
+    this.saveButton.disabled = true;
+    this.saveButton.addEventListener("click", () => this.save());
+    const skip = btnRow.createEl("button", { text: "Skip for now" });
+    skip.addEventListener("click", () => this.close());
+  }
+  updateSaveState() {
+    const val = this.apiKeyInput.value.trim();
+    this.saveButton.disabled = val.length < 10;
+  }
+  async save() {
+    const key = this.apiKeyInput.value.trim();
+    if (!key) return;
+    this.saveButton.disabled = true;
+    this.saveButton.textContent = "Checking...";
+    this.statusEl.empty();
+    const oldKey = this.plugin.settings.apiKey;
+    this.plugin.settings.apiKey = key;
+    try {
+      const user = await this.plugin.api.getUser();
+      await this.plugin.saveSettings();
+      this.statusEl.createEl("span", { text: "Connected! Welcome, " + (user.display_name || "there") + "." });
+      setTimeout(() => this.close(), 1200);
+    } catch (err) {
+      this.plugin.settings.apiKey = oldKey;
+      this.statusEl.createEl("span", {
+        text: "Could not connect. Check your API key and try again.",
+        cls: "pushsidian-setup-error"
+      });
+      this.saveButton.textContent = "Save and connect";
+      this.saveButton.disabled = false;
+    }
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+
 // src/main.ts
 var VIEW_TYPE_TEAM = "pushsidian-team-panel";
 var DEFAULT_SETTINGS = {
@@ -454,7 +531,7 @@ var DEFAULT_SETTINGS = {
   orgId: "",
   syncEnabled: true
 };
-var TeamPanelView = class extends import_obsidian4.ItemView {
+var TeamPanelView = class extends import_obsidian5.ItemView {
   constructor(leaf) {
     super(leaf);
   }
@@ -471,7 +548,7 @@ var TeamPanelView = class extends import_obsidian4.ItemView {
     container.createEl("p", { text: "Shared documents will appear here." });
   }
 };
-var PushsidianPlugin = class extends import_obsidian4.Plugin {
+var PushsidianPlugin = class extends import_obsidian5.Plugin {
   constructor() {
     super(...arguments);
     __publicField(this, "settings");
@@ -484,13 +561,16 @@ var PushsidianPlugin = class extends import_obsidian4.Plugin {
     this.api = new PushsidianAPI(this);
     this.fileWatcher = new FileWatcher(this);
     this.downloader = new Downloader(this);
+    if (!this.settings.apiKey) {
+      new SetupModal(this.app, this).open();
+    }
     this.addRibbonIcon("share", "Share note", () => {
       const file = this.app.workspace.getActiveFile();
       if (file) {
         const pending = this.__pendingMentions || [];
         new ShareModal(this.app, this, file, pending).open();
       } else {
-        new import_obsidian4.Notice("No file is currently open");
+        new import_obsidian5.Notice("No file is currently open");
       }
     });
     this.addCommand({
@@ -514,21 +594,21 @@ var PushsidianPlugin = class extends import_obsidian4.Plugin {
       name: "Sync shared documents now",
       callback: async () => {
         await this.downloader.syncSharedDocuments();
-        new import_obsidian4.Notice("Shared documents synced");
+        new import_obsidian5.Notice("Shared documents synced");
       }
     });
     this.addSettingTab(new PushsidianSettingTab(this.app, this));
     if (this.settings.syncEnabled) {
       this.registerEvent(
         this.app.vault.on("create", (file) => {
-          if (file instanceof import_obsidian4.TFile && file.extension === "md") {
+          if (file instanceof import_obsidian5.TFile && file.extension === "md") {
             this.fileWatcher.onFileChange(file);
           }
         })
       );
       this.registerEvent(
         this.app.vault.on("modify", (file) => {
-          if (file instanceof import_obsidian4.TFile && file.extension === "md") {
+          if (file instanceof import_obsidian5.TFile && file.extension === "md") {
             this.fileWatcher.onFileChange(file);
           }
         })
@@ -564,7 +644,7 @@ var PushsidianPlugin = class extends import_obsidian4.Plugin {
     });
   }
 };
-var PushsidianSettingTab = class extends import_obsidian4.PluginSettingTab {
+var PushsidianSettingTab = class extends import_obsidian5.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     __publicField(this, "plugin");
@@ -574,25 +654,25 @@ var PushsidianSettingTab = class extends import_obsidian4.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Pushsidian Settings" });
-    new import_obsidian4.Setting(containerEl).setName("API Key").setDesc("Your Pushsidian API key from the web app").addText(
+    new import_obsidian5.Setting(containerEl).setName("API Key").setDesc("Your Pushsidian API key from the web app").addText(
       (text) => text.setPlaceholder("psk_...").setValue(this.plugin.settings.apiKey).onChange(async (value) => {
         this.plugin.settings.apiKey = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("API Base URL").setDesc("Override the API endpoint").addText(
+    new import_obsidian5.Setting(containerEl).setName("API Base URL").setDesc("Override the API endpoint").addText(
       (text) => text.setPlaceholder("https://api.pushsidian.com").setValue(this.plugin.settings.apiBaseUrl).onChange(async (value) => {
         this.plugin.settings.apiBaseUrl = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Organization ID").setDesc("Your team organization ID").addText(
+    new import_obsidian5.Setting(containerEl).setName("Organization ID").setDesc("Your team organization ID").addText(
       (text) => text.setPlaceholder("org_...").setValue(this.plugin.settings.orgId).onChange(async (value) => {
         this.plugin.settings.orgId = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Enable sync").setDesc("Automatically sync shared notes").addToggle(
+    new import_obsidian5.Setting(containerEl).setName("Enable sync").setDesc("Automatically sync shared notes").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.syncEnabled).onChange(async (value) => {
         this.plugin.settings.syncEnabled = value;
         await this.plugin.saveSettings();

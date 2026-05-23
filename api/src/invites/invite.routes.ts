@@ -111,12 +111,6 @@ const routes: FastifyPluginAsyncZod = async (app) => {
         .executeTakeFirst();
 
       if (invite) {
-        const newMember = await db
-          .selectFrom("subjects")
-          .select("display_name")
-          .where("id", "=", user.id)
-          .executeTakeFirst();
-
         let invitedByName: string | null = null;
         if (invite.created_by) {
           const inviter = await db
@@ -129,7 +123,7 @@ const routes: FastifyPluginAsyncZod = async (app) => {
 
         void notifyMemberJoined(
           invite.org_id,
-          newMember?.display_name ?? "Someone",
+          user.displayName,
           invitedByName
         );
       }

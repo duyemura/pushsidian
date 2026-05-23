@@ -31,15 +31,13 @@ jobs:
       - run: pnpm install
       - run: pnpm typecheck
 
-  # Deploy disabled until Railway token is configured
-  # See: https://railway.app/dashboard → Project Settings → Tokens
-  # deploy:
-  #   needs: test
-  #   if: github.ref == 'refs/heads/main'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - run: npm install -g @railway/cli
-  #     - run: railway up
-  #       env:
-  #         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install -g @railway/cli
+      - run: railway up
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

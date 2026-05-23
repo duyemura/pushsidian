@@ -1,6 +1,8 @@
 import "dotenv/config";
 import fastify from "fastify";
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
+import { resolve } from "path";
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
 import documentRoutes from "./documents/document.routes";
 import orgRoutes from "./organizations/org.routes";
@@ -18,8 +20,12 @@ async function main() {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
+  const corsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(",")
+    : ["http://localhost:5173", "http://localhost:5175", "app://obsidian.md"];
+
   await app.register(cors, {
-    origin: ["http://localhost:5173", "http://localhost:5175", "app://obsidian.md"],
+    origin: corsOrigins,
     credentials: true,
   });
 
@@ -44,6 +50,21 @@ async function main() {
   await app.register(inviteRoutes, { prefix: "/api/invites" });
   await app.register(userRoutes, { prefix: "/api/user" });
   await app.register(clerkWebhookRoutes, { prefix: "/webhooks" });
+
+  // Serve built web app in production
+  const publicDir = resolve(__dirname, "../../public");
+  try {
+    await app.register(fastifyStatic, {
+      root: publicDir,
+      wildcard: false,
+    });
+    app.setNotFoundHandler(async (req, reply) => {
+      // SPA fallback: serve index.html for unknown routes
+      await reply.sendFile("index.html", publicDir);
+    });
+  } catch {
+    // public dir doesn't exist — dev mode, skip static serving
+  }
 
   const port = parseInt(process.env.PORT || "8080", 10);
   await app.listen({ port, host: "0.0.0.0" });

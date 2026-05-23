@@ -71,7 +71,8 @@ export async function verifyAuth(req: FastifyRequest): Promise<CurrentUser> {
       .onConflict((oc) =>
         oc.column("id").doUpdateSet({
           email,
-          display_name: displayName,
+          // NOTE: do not overwrite display_name here —
+          // once created, the user controls their name in our app.
         })
       )
       .execute();

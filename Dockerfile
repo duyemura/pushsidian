@@ -46,8 +46,8 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY api/package.json api/
 COPY packages/shared-types/package.json packages/shared-types/
 
-# Install production deps only
-RUN pnpm install --prod
+# Install production deps only (skip postinstall scripts — pnpm v10 blocks them by default)
+RUN pnpm install --prod --ignore-scripts
 
 # Copy built API + web
 COPY --from=builder /app/api/dist api/dist/

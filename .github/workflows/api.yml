@@ -6,6 +6,8 @@ on:
     paths:
       - "api/**"
       - ".github/workflows/api.yml"
+      - "Dockerfile"
+      - "railway.json"
   pull_request:
     branches: [main]
     paths:
@@ -29,16 +31,15 @@ jobs:
       - run: pnpm install
       - run: pnpm typecheck
 
-  deploy:
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./api
-    steps:
-      - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  # Deploy disabled until Railway token is configured
+  # See: https://railway.app/dashboard → Project Settings → Tokens
+  # deploy:
+  #   needs: test
+  #   if: github.ref == 'refs/heads/main'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: npm install -g @railway/cli
+  #     - run: railway up
+  #       env:
+  #         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

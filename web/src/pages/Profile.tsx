@@ -17,7 +17,19 @@ interface ApiKey {
   last_used_at: string | null;
 }
 
+interface UserProfile {
+  id: string;
+  display_name: string;
+  email: string;
+  slack_handle: string | null;
+}
+
 export default function Profile() {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [editingHandle, setEditingHandle] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -26,6 +38,13 @@ export default function Profile() {
   const [label, setLabel] = useState("");
 
   useEffect(() => {
+    fetchWithAuth("/api/user/me")
+      .then((data: UserProfile) => {
+        setUser(data);
+        setEditingName(data.display_name);
+        setEditingHandle(data.slack_handle || "");
+      })
+      .catch(() => {});
     fetchWithAuth("/api/user/orgs")
       .then((data: Org[]) => {
         setOrgs(data);
@@ -61,6 +80,26 @@ export default function Profile() {
     loadKeys();
   };
 
+  const saveProfile = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      await fetchWithAuth("/api/user/me", {
+        method: "PUT",
+        body: JSON.stringify({
+          display_name: editingName.trim() || undefined,
+          slack_handle: editingHandle.trim() || null,
+        }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const copy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -70,6 +109,42 @@ export default function Profile() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+
+      {user && (
+        <div className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h2 className="text-sm font-medium text-gray-700">Your info</h2>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Slack handle</label>
+              <input
+                type="text"
+                value={editingHandle}
+                onChange={(e) => setEditingHandle(e.target.value)}
+                placeholder="@alice"
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={saveProfile}
+              disabled={saving}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : saved ? "Saved" : "Save changes"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <h2 className="text-sm font-medium text-gray-700">Organizations</h2>

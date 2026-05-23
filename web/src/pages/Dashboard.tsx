@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { marked } from "marked";
 import { fetchWithAuth } from "../api/client";
 
+function stripFrontmatter(content: string): string {
+  return content.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, "");
+}
+
 interface Document {
   id: string;
   obsidian_path: string;
@@ -375,7 +379,7 @@ export default function Dashboard() {
               ) : (
                 <div
                   className="prose prose-sm max-w-none text-gray-800"
-                  dangerouslySetInnerHTML={{ __html: marked.parse(docContent || "") }}
+                  dangerouslySetInnerHTML={{ __html: marked.parse(stripFrontmatter(docContent || "")) }}
                 />
               )}
             </div>

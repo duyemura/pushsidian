@@ -3,6 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { marked } from "marked";
 import { fetchWithAuth } from "../api/client";
 
+function stripFrontmatter(content: string): string {
+  return content.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, "");
+}
+
 interface DocumentMeta {
   id: string;
   obsidian_path: string;
@@ -66,8 +70,6 @@ export default function DocumentViewer() {
     );
   }
 
-  const html = marked.parse(content, { async: false }) as string;
-
   return (
     <div className="max-w-5xl mx-auto">
       <button
@@ -104,7 +106,7 @@ export default function DocumentViewer() {
 
         <div
           className="prose prose-slate max-w-none px-6 py-6"
-          dangerouslySetInnerHTML={{ __html: html }}
+          dangerouslySetInnerHTML={{ __html: marked.parse(stripFrontmatter(content), { async: false }) as string }}
         />
       </div>
     </div>

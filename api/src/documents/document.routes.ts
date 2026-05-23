@@ -90,7 +90,7 @@ const routes: FastifyPluginAsyncZod = async (app) => {
           obsidian_path: d.obsidian_path,
           title: d.title,
           owner_id: d.owner_id,
-          owner_name: d.owner_id === user.id ? "You" : (nameById.get(d.owner_id) ?? d.owner_id.split("_").pop()?.slice(0, 8) ?? d.owner_id),
+          owner_name: d.owner_id === user.id ? "You" : (nameById.get(d.owner_id) || d.owner_id.split("_").pop()?.slice(0, 8) ?? d.owner_id),
           org_name: orgName,
           version: d.version,
           updated_at: d.updated_at.toISOString(),
@@ -249,7 +249,9 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       if (!doc) throw new Error("Not found");
       const { getDocumentContent } = await import("../s3.js");
       const content = await getDocumentContent(doc.s3_key);
-      return { content };
+      // Strip YAML frontmatter so it doesn't render as text
+      const clean = content.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, "");
+      return { content: clean };
     }
   );
 

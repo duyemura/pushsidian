@@ -5,6 +5,7 @@ import { fetchWithAuth } from "../api/client";
 interface Member {
   id: string;
   display_name: string;
+  slack_handle: string | null;
   email: string | null;
   role: string;
 }
@@ -266,7 +267,10 @@ export default function TeamSettings() {
                   <div className="text-sm font-medium text-gray-900">
                     {m.display_name}
                   </div>
-                  {m.email && (
+                  {m.slack_handle && (
+                    <div className="text-xs text-gray-500">{m.slack_handle}</div>
+                  )}
+                  {m.email && !m.slack_handle && (
                     <div className="text-xs text-gray-500">{m.email}</div>
                   )}
                 </div>

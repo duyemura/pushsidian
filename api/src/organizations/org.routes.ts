@@ -96,6 +96,7 @@ const routes: FastifyPluginAsyncZod = async (app) => {
       return members.map((m) => ({
         id: m.id,
         display_name: m.display_name?.trim() || m.email?.split("@")[0] || "Unknown",
+        slack_handle: m.slack_handle,
         email: m.email,
         role: m.role,
         created_at: m.created_at.toISOString(),

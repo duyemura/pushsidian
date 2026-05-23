@@ -149,6 +149,7 @@ export class OrgService {
       .select([
         "subjects.id",
         "subjects.display_name",
+        "subjects.slack_handle",
         "subjects.email",
         "org_memberships.role",
         "org_memberships.created_at",
